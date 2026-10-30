@@ -1,5 +1,6 @@
 mod arguments;
 mod game;
+mod instance_lock;
 mod ninjabrain;
 mod overlay;
 mod service;

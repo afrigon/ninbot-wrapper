@@ -6,6 +6,7 @@ use tracing::info;
 use crate::arguments::Arguments;
 use crate::game::GameState;
 use crate::game::StateWatcher;
+use crate::instance_lock::InstanceLock;
 use crate::ninjabrain::Boat;
 use crate::ninjabrain::BotProcess;
 use crate::ninjabrain::EventStream;
@@ -30,7 +31,14 @@ impl Service {
     pub async fn run(self) -> Result<()> {
         let client = Client::builder().user_agent(USER_AGENT).build()?;
         let renderer = Renderer::new()?;
-        let mut writer = FrameWriter::new(self.arguments.output)?;
+        let mut writer = FrameWriter::new(self.arguments.output.clone())?;
+        let Some(_lock) = InstanceLock::acquire(&self.arguments.output)? else {
+            info!(
+                "another instance already renders to {}",
+                self.arguments.output.display()
+            );
+            return Ok(());
+        };
         writer.write(renderer.render(&Line::default())?)?;
 
         let jar = Release::new(client.clone())?.jar().await?;
