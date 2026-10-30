@@ -50,7 +50,15 @@ impl StateWatcher {
     }
 
     fn publish(path: &Path, sender: &watch::Sender<Option<GameState>>) {
-        let state = Self::read(path);
+        let state = match Self::contents(path) {
+            // The writer truncates before writing; its write sends another event.
+            Some(contents) if contents.trim().is_empty() => return,
+            Some(contents) => contents
+                .parse()
+                .inspect_err(|error| warn!("{error:#}"))
+                .ok(),
+            None => None
+        };
 
         sender.send_if_modified(|current| {
             let changed = *current != state;
@@ -59,12 +67,9 @@ impl StateWatcher {
         });
     }
 
-    fn read(path: &Path) -> Option<GameState> {
+    fn contents(path: &Path) -> Option<String> {
         match fs::read_to_string(path) {
-            Ok(contents) => contents
-                .parse()
-                .inspect_err(|error| warn!("{error:#}"))
-                .ok(),
+            Ok(contents) => Some(contents),
             Err(error) if error.kind() == ErrorKind::NotFound => None,
             Err(error) => {
                 warn!("could not read {}: {error}", path.display());
