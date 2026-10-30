@@ -1,0 +1,31 @@
+[settings]
+lockfile = true
+
+[tools]
+rust = "1.99"
+
+[tasks.build]
+description = "Build in release mode"
+run = "cargo build --release --locked"
+
+[tasks.run]
+description = "Build and run ninbot-wrapper"
+run = "cargo run --"
+
+[tasks.test]
+description = "Run the test suite"
+run = "cargo test --locked"
+
+[tasks.lint]
+description = "Lint with clippy"
+run = "cargo clippy --locked --all-targets -- -D warnings"
+
+[tasks.format]
+description = "Format with the nightly rustfmt the rustfmt.toml requires"
+tools = { rust = "nightly-2026-08-31" }
+run = "cargo fmt"
+
+[tasks.cross]
+description = "Cross-compile in release mode through cross"
+tools = { "ubi:cross-rs/cross" = "0.2" }
+run = "cross build --release --locked"
