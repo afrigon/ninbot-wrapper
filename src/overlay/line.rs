@@ -89,7 +89,6 @@ impl Line {
                 })
                 .into_iter()
                 .collect(),
-            Self::turn(stronghold).into_iter().collect(),
             Self::accuracy(stronghold),
             Self::warnings(messages),
             Self::next_throw(messages).into_iter().collect(),
@@ -337,8 +336,6 @@ mod tests {
                 "|",
                 "1530 (191)",
                 "|",
-                "  8 >",
-                "|",
                 "96.3%",
                 "-2",
                 "|",
@@ -346,10 +343,6 @@ mod tests {
                 "|",
                 "< 12 | 15 > for 95%"
             ]
-        );
-        assert_eq!(
-            line.segments[5].pieces[1],
-            Piece::text("8 >", Palette::Turn(8))
         );
     }
 
@@ -364,11 +357,15 @@ mod tests {
             texts(&line),
             ["[boat]", "-24 40 170", "|", "191", "|", "  8 >"]
         );
+        assert_eq!(
+            line.segments[5].pieces[1],
+            Piece::text("8 >", Palette::Turn(8))
+        );
     }
 
     #[test]
     fn turns_left_with_the_arrow_first() {
-        let mut stronghold = triangulated(false);
+        let mut stronghold = triangulated(true);
         stronghold
             .player_position
             .as_mut()
@@ -380,10 +377,8 @@ mod tests {
     }
 
     #[test]
-    fn omits_the_turn_without_a_player_position() {
-        let mut stronghold = triangulated(false);
-        stronghold.player_position = None;
-        let line = line(&stronghold, &InformationMessages::default());
+    fn omits_the_turn_after_an_overworld_measurement() {
+        let line = line(&triangulated(false), &InformationMessages::default());
 
         assert_eq!(
             texts(&line),
