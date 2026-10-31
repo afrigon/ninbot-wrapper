@@ -5,6 +5,7 @@ use crate::game::GameState;
 use crate::ninjabrain::Boat;
 use crate::ninjabrain::Dimension;
 use crate::ninjabrain::InformationMessages;
+use crate::ninjabrain::MessageKind;
 use crate::ninjabrain::PlayerPosition;
 use crate::ninjabrain::Prediction;
 use crate::ninjabrain::ResultType;
@@ -45,6 +46,11 @@ impl Line {
             .map(PlayerPosition::dimension);
         let sections = match dimension {
             Some(Dimension::Nether) => Self::nether_sections(stronghold),
+            Some(Dimension::Overworld | Dimension::End) | None
+                if messages.reports(&MessageKind::PortalLinking) =>
+            {
+                Self::portal_linking_sections(stronghold, messages)
+            }
             Some(Dimension::Overworld | Dimension::End) | None => {
                 Self::overworld_sections(stronghold, messages)
             }
@@ -97,6 +103,25 @@ impl Line {
         ]
     }
 
+    fn portal_linking_sections(
+        stronghold: &Stronghold,
+        messages: &InformationMessages
+    ) -> Vec<Vec<Segment>> {
+        let prediction = stronghold.prediction();
+
+        vec![
+            prediction
+                .map(Self::overworld_coordinates)
+                .into_iter()
+                .collect(),
+            prediction
+                .map(|prediction| Segment::text(prediction.distance().to_string(), Palette::Text))
+                .into_iter()
+                .collect(),
+            Self::warnings(messages),
+        ]
+    }
+
     fn nether_sections(stronghold: &Stronghold) -> Vec<Vec<Segment>> {
         let prediction = stronghold.prediction();
 
@@ -121,6 +146,14 @@ impl Line {
             Self::coordinate(prediction.nether_x()),
             Piece::text(format!(" {STRONGHOLD_Y} "), Palette::Text),
             Self::coordinate(prediction.nether_z()),
+        ])
+    }
+
+    fn overworld_coordinates(prediction: &Prediction) -> Segment {
+        Segment::new(vec![
+            Self::coordinate(prediction.overworld_x()),
+            Piece::text(" ", Palette::Text),
+            Self::coordinate(prediction.overworld_z()),
         ])
     }
 
@@ -325,7 +358,7 @@ mod tests {
     #[test]
     fn shows_every_section_after_an_overworld_measurement() {
         let messages = messages(json!([
-            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" },
+            { "severity": "WARNING", "type": "SOMETHING_ELSE", "message": "" },
             {
                 "severity": "INFO",
                 "type": "NEXT_THROW_DIRECTION",
@@ -346,7 +379,7 @@ mod tests {
                 "96.3%",
                 "-2",
                 "|",
-                "portal linking",
+                "something else",
                 "|",
                 "< 12 | 15 > for 95%"
             ]
@@ -408,6 +441,37 @@ mod tests {
         let line = line(&stronghold, &InformationMessages::default());
 
         assert_eq!(texts(&line)[5], "96.3%");
+    }
+
+    #[test]
+    fn portal_linking_shows_overworld_coordinates_and_distance() {
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" },
+            {
+                "severity": "INFO",
+                "type": "NEXT_THROW_DIRECTION",
+                "message": "Go left 12 blocks, or right 15 blocks, for ~95% certainty after next measurement."
+            }
+        ]));
+        let line = line(&triangulated(false), &messages);
+
+        assert_eq!(
+            texts(&line),
+            ["[boat]", "-188 1364", "|", "1530", "|", "portal linking"]
+        );
+    }
+
+    #[test]
+    fn nether_layout_wins_over_portal_linking() {
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" }
+        ]));
+        let line = line(&triangulated(true), &messages);
+
+        assert_eq!(
+            texts(&line),
+            ["[boat]", "-24 40 170", "|", "191", "|", "  8 >"]
+        );
     }
 
     #[test]

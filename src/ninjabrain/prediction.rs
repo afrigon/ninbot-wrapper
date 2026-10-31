@@ -5,6 +5,8 @@ use super::PlayerPosition;
 const OVERWORLD_BLOCKS_PER_NETHER_BLOCK: i64 = 8;
 const NETHER_BLOCKS_PER_CHUNK: i32 = 2;
 const BLOCKS_PER_CHUNK: i32 = 16;
+// Ninjabrain Bot aims at block 4,4 of the chunk, and shows it as the location with its default
+// "4,4" stronghold display type.
 const TARGET_OFFSET_IN_CHUNK: i32 = 4;
 const HALF_TURN_DEGREES: f64 = 180.0;
 const FULL_TURN_DEGREES: f64 = 360.0;

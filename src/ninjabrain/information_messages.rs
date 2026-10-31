@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use super::InformationMessage;
+use super::MessageKind;
 use super::NextThrow;
 use super::Severity;
 
@@ -21,6 +22,12 @@ impl InformationMessages {
         self.information_messages
             .iter()
             .filter(|message| message.severity != Severity::Info && !message.is_fatal())
+    }
+
+    pub fn reports(&self, kind: &MessageKind) -> bool {
+        self.information_messages
+            .iter()
+            .any(|message| message.kind == *kind)
     }
 
     pub fn next_throw(&self) -> Option<NextThrow> {
