@@ -20,6 +20,22 @@ const SEPARATOR: &str = "|";
 const LEFT_TURN_ARROW: &str = "< ";
 const RIGHT_TURN_ARROW: &str = " >";
 
+#[derive(Debug, Clone, Copy)]
+enum Route {
+    Nether,
+    Overworld
+}
+
+impl Route {
+    fn reported_by(messages: &InformationMessages) -> Self {
+        if messages.reports(&MessageKind::PortalLinking) {
+            Self::Overworld
+        } else {
+            Self::Nether
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Line {
     pub segments: Vec<Segment>
@@ -46,13 +62,8 @@ impl Line {
             .map(PlayerPosition::dimension);
         let sections = match dimension {
             Some(Dimension::Nether) => Self::nether_sections(stronghold),
-            Some(Dimension::Overworld | Dimension::End) | None
-                if messages.reports(&MessageKind::PortalLinking) =>
-            {
-                Self::portal_linking_sections(stronghold, messages)
-            }
             Some(Dimension::Overworld | Dimension::End) | None => {
-                Self::overworld_sections(stronghold, messages)
+                Self::overworld_sections(stronghold, messages, Route::reported_by(messages))
             }
         };
         let mut segments = vec![Self::boat(boat)];
@@ -78,23 +89,18 @@ impl Line {
 
     fn overworld_sections(
         stronghold: &Stronghold,
-        messages: &InformationMessages
+        messages: &InformationMessages,
+        route: Route
     ) -> Vec<Vec<Segment>> {
         let prediction = stronghold.prediction();
 
         vec![
-            prediction.map(Self::coordinates).into_iter().collect(),
             prediction
-                .map(|prediction| {
-                    Segment::text(
-                        format!(
-                            "{} ({})",
-                            prediction.distance(),
-                            prediction.nether_distance()
-                        ),
-                        Palette::Text
-                    )
-                })
+                .map(|prediction| Self::coordinates(prediction, route))
+                .into_iter()
+                .collect(),
+            prediction
+                .map(|prediction| Self::distance(prediction, route))
                 .into_iter()
                 .collect(),
             Self::accuracy(stronghold),
@@ -103,30 +109,14 @@ impl Line {
         ]
     }
 
-    fn portal_linking_sections(
-        stronghold: &Stronghold,
-        messages: &InformationMessages
-    ) -> Vec<Vec<Segment>> {
-        let prediction = stronghold.prediction();
-
-        vec![
-            prediction
-                .map(Self::overworld_coordinates)
-                .into_iter()
-                .collect(),
-            prediction
-                .map(|prediction| Segment::text(prediction.distance().to_string(), Palette::Text))
-                .into_iter()
-                .collect(),
-            Self::warnings(messages),
-        ]
-    }
-
     fn nether_sections(stronghold: &Stronghold) -> Vec<Vec<Segment>> {
         let prediction = stronghold.prediction();
 
         vec![
-            prediction.map(Self::coordinates).into_iter().collect(),
+            prediction
+                .map(|prediction| Self::coordinates(prediction, Route::Nether))
+                .into_iter()
+                .collect(),
             prediction
                 .map(|prediction| {
                     Segment::text(prediction.nether_distance().to_string(), Palette::Text)
@@ -141,20 +131,30 @@ impl Line {
         Segment::new(vec![Piece::Boat(boat.boat_state)])
     }
 
-    fn coordinates(prediction: &Prediction) -> Segment {
+    fn coordinates(prediction: &Prediction, route: Route) -> Segment {
+        let (x, z) = match route {
+            Route::Nether => (prediction.nether_x(), prediction.nether_z()),
+            Route::Overworld => (prediction.overworld_x(), prediction.overworld_z())
+        };
+
         Segment::new(vec![
-            Self::coordinate(prediction.nether_x()),
+            Self::coordinate(x),
             Piece::text(format!(" {STRONGHOLD_Y} "), Palette::Text),
-            Self::coordinate(prediction.nether_z()),
+            Self::coordinate(z),
         ])
     }
 
-    fn overworld_coordinates(prediction: &Prediction) -> Segment {
-        Segment::new(vec![
-            Self::coordinate(prediction.overworld_x()),
-            Piece::text(" ", Palette::Text),
-            Self::coordinate(prediction.overworld_z()),
-        ])
+    fn distance(prediction: &Prediction, route: Route) -> Segment {
+        let text = match route {
+            Route::Nether => format!(
+                "{} ({})",
+                prediction.distance(),
+                prediction.nether_distance()
+            ),
+            Route::Overworld => prediction.distance().to_string()
+        };
+
+        Segment::text(text, Palette::Text)
     }
 
     fn coordinate(value: i32) -> Piece {
@@ -457,7 +457,19 @@ mod tests {
 
         assert_eq!(
             texts(&line),
-            ["[boat]", "-188 1364", "|", "1530", "|", "portal linking"]
+            [
+                "[boat]",
+                "-188 40 1364",
+                "|",
+                "1530",
+                "|",
+                "96.3%",
+                "-2",
+                "|",
+                "portal linking",
+                "|",
+                "< 12 | 15 > for 95%"
+            ]
         );
     }
 
