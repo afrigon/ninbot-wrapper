@@ -15,6 +15,8 @@ const HIGH_CERTAINTY: f64 = 0.95;
 const MEDIUM_CERTAINTY: f64 = 0.9;
 const STRONGHOLD_Y: i32 = 40;
 const SEPARATOR: &str = "|";
+const LEFT_TURN_ARROW: &str = "< ";
+const RIGHT_TURN_ARROW: &str = " >";
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Line {
@@ -126,13 +128,16 @@ impl Line {
         let player = stronghold.player_position.as_ref()?;
         let turn = prediction.turn_angle(player);
         let degrees = turn.abs().round() as u8;
-        let text = if turn > 0.0 {
-            format!("  {degrees} >")
-        } else {
-            format!("< {degrees}")
-        };
+        let color = Palette::Turn(degrees);
 
-        Some(Segment::text(text, Palette::Turn(degrees)))
+        if turn > 0.0 {
+            Some(Segment::new(vec![
+                Piece::Hidden(LEFT_TURN_ARROW.to_string()),
+                Piece::text(format!("{degrees}{RIGHT_TURN_ARROW}"), color),
+            ]))
+        } else {
+            Some(Segment::text(format!("{LEFT_TURN_ARROW}{degrees}"), color))
+        }
     }
 
     fn accuracy(stronghold: &Stronghold) -> Vec<Segment> {
@@ -236,6 +241,7 @@ mod tests {
                     .iter()
                     .map(|piece| match piece {
                         Piece::Text { text, .. } => text.clone(),
+                        Piece::Hidden(text) => " ".repeat(text.len()),
                         Piece::Boat(_) => "[boat]".to_string()
                     })
                     .collect()
@@ -296,8 +302,8 @@ mod tests {
             ]
         );
         assert_eq!(
-            line.segments[5].pieces[0],
-            Piece::text("  8 >", Palette::Turn(8))
+            line.segments[5].pieces[1],
+            Piece::text("8 >", Palette::Turn(8))
         );
     }
 

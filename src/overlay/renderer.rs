@@ -74,12 +74,15 @@ impl Renderer {
 
     fn width(&self, piece: &Piece) -> u32 {
         match piece {
-            Piece::Text { text, .. } => text
-                .chars()
-                .map(|character| Self::advance(Glyph::of(character)) * SCALE)
-                .sum(),
+            Piece::Text { text, .. } | Piece::Hidden(text) => Self::text_width(text),
             Piece::Boat(state) => self.boat(*state).width()
         }
+    }
+
+    fn text_width(text: &str) -> u32 {
+        text.chars()
+            .map(|character| Self::advance(Glyph::of(character)) * SCALE)
+            .sum()
     }
 
     fn draw(&self, pixmap: &mut Pixmap, piece: &Piece, x: u32, y: u32) {
@@ -97,6 +100,7 @@ impl Renderer {
                     x += Self::advance(glyph) * SCALE;
                 }
             }
+            Piece::Hidden(_) => {}
             Piece::Boat(state) => {
                 let icon = self.boat(*state);
                 let y = y + (CONTENT_HEIGHT - icon.height()) / 2;
@@ -139,5 +143,20 @@ impl Renderer {
             BoatState::Valid => &self.boat_valid,
             BoatState::Error => &self.boat_error
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn hidden_text_reserves_the_width_of_the_visible_text() {
+        let renderer = Renderer::new().unwrap();
+
+        assert_eq!(
+            renderer.width(&Piece::Hidden("< ".to_string())),
+            renderer.width(&Piece::text("< ", Palette::Text))
+        );
     }
 }

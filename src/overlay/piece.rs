@@ -4,6 +4,7 @@ use crate::ninjabrain::BoatState;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Piece {
     Text { text: String, color: Palette },
+    Hidden(String),
     Boat(BoatState)
 }
 
