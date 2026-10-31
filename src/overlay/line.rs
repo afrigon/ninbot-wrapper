@@ -136,7 +136,10 @@ impl Line {
                 Piece::text(format!("{degrees}{RIGHT_TURN_ARROW}"), color),
             ]))
         } else {
-            Some(Segment::text(format!("{LEFT_TURN_ARROW}{degrees}"), color))
+            Some(Segment::new(vec![
+                Piece::text(format!("{LEFT_TURN_ARROW}{degrees}"), color),
+                Piece::Hidden(RIGHT_TURN_ARROW.to_string()),
+            ]))
         }
     }
 
@@ -331,7 +334,7 @@ mod tests {
             .horizontal_angle = 90.0;
         let line = line(&stronghold, &InformationMessages::default());
 
-        assert_eq!(texts(&line)[5], "< 82");
+        assert_eq!(texts(&line)[5], "< 82  ");
     }
 
     #[test]
