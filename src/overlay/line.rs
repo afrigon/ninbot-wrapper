@@ -8,7 +8,6 @@ use crate::ninjabrain::InformationMessages;
 use crate::ninjabrain::PlayerPosition;
 use crate::ninjabrain::Prediction;
 use crate::ninjabrain::ResultType;
-use crate::ninjabrain::Severity;
 use crate::ninjabrain::Stronghold;
 
 const HIGH_CERTAINTY: f64 = 0.95;
@@ -32,6 +31,10 @@ impl Line {
     ) -> Self {
         if !state.is_some_and(GameState::is_playing) {
             return Self::default();
+        }
+
+        if let Some(segments) = Self::fatal(stronghold, messages) {
+            return Self { segments };
         }
 
         let dimension = stronghold
@@ -88,7 +91,8 @@ impl Line {
                 .collect(),
             Self::turn(stronghold).into_iter().collect(),
             Self::accuracy(stronghold),
-            Self::errors(stronghold, messages),
+            Self::warnings(messages),
+            Self::next_throw(messages).into_iter().collect(),
         ]
     }
 
@@ -153,19 +157,24 @@ impl Line {
             ));
         }
 
-        let correction = stronghold.correction_increments();
-
-        if correction != 0 {
-            segments.push(Segment::text(
-                format!("{correction:+}"),
-                Self::sign_color(correction)
-            ));
-        }
-
+        segments.extend(Self::adjustment(stronghold));
         segments
     }
 
-    fn errors(stronghold: &Stronghold, messages: &InformationMessages) -> Vec<Segment> {
+    fn adjustment(stronghold: &Stronghold) -> Option<Segment> {
+        let correction = stronghold.correction_increments();
+
+        if correction == 0 {
+            return None;
+        }
+
+        Some(Segment::text(
+            format!("{correction:+}"),
+            Self::sign_color(correction)
+        ))
+    }
+
+    fn fatal(stronghold: &Stronghold, messages: &InformationMessages) -> Option<Vec<Segment>> {
         let mut segments = Vec::new();
         let failed = stronghold.result_type == ResultType::Failed;
 
@@ -173,15 +182,38 @@ impl Line {
             segments.push(Segment::text("reset measurements", Palette::Error));
         }
 
-        for message in messages.warnings() {
-            let color = match message.severity {
-                Severity::Error => Palette::Error,
-                Severity::Warning | Severity::Info => Palette::Warning
-            };
-            segments.push(Segment::text(message.label(), color));
+        for message in messages.fatal() {
+            segments.push(Segment::text(message.label(), Palette::Error));
         }
 
-        segments
+        if segments.is_empty() {
+            return None;
+        }
+
+        if messages.fatal().any(|message| message.keeps_adjustment()) {
+            segments.extend(Self::adjustment(stronghold));
+        }
+
+        Some(segments)
+    }
+
+    fn warnings(messages: &InformationMessages) -> Vec<Segment> {
+        messages
+            .warnings()
+            .map(|message| Segment::text(message.label(), Palette::Warning))
+            .collect()
+    }
+
+    fn next_throw(messages: &InformationMessages) -> Option<Segment> {
+        let next_throw = messages.next_throw()?;
+
+        Some(Segment::text(
+            format!(
+                "{LEFT_TURN_ARROW}{} {SEPARATOR} {}{RIGHT_TURN_ARROW} for {}%",
+                next_throw.left, next_throw.right, next_throw.certainty
+            ),
+            Palette::Text
+        ))
     }
 
     fn sign_color(value: i32) -> Palette {
@@ -280,12 +312,21 @@ mod tests {
         assert_eq!(texts(&line), ["[boat]"]);
     }
 
+    fn messages(value: serde_json::Value) -> InformationMessages {
+        serde_json::from_value(json!({ "informationMessages": value })).unwrap()
+    }
+
     #[test]
     fn shows_every_section_after_an_overworld_measurement() {
-        let messages: InformationMessages = serde_json::from_value(json!({
-            "informationMessages": [{ "severity": "WARNING", "type": "MISMEASURE" }]
-        }))
-        .unwrap();
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" },
+            {
+                "severity": "INFO",
+                "type": "NEXT_THROW_DIRECTION",
+                "message": "Go left 12 blocks, or right 15 blocks, for ~95% certainty after next measurement."
+            },
+            { "severity": "INFO", "type": "COMBINED_CERTAINTY", "message": "" }
+        ]));
         let line = line(&triangulated(false), &messages);
 
         assert_eq!(
@@ -301,7 +342,9 @@ mod tests {
                 "96.3%",
                 "-2",
                 "|",
-                "mismeasure"
+                "portal linking",
+                "|",
+                "< 12 | 15 > for 95%"
             ]
         );
         assert_eq!(
@@ -312,10 +355,9 @@ mod tests {
 
     #[test]
     fn shows_only_travel_details_after_a_nether_measurement() {
-        let messages: InformationMessages = serde_json::from_value(json!({
-            "informationMessages": [{ "severity": "WARNING", "type": "MISMEASURE" }]
-        }))
-        .unwrap();
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" }
+        ]));
         let line = line(&triangulated(true), &messages);
 
         assert_eq!(
@@ -358,33 +400,40 @@ mod tests {
     }
 
     #[test]
-    fn asks_for_reset_without_a_separator_after_the_boat() {
+    fn reset_is_fatal() {
         let failed = stronghold(json!({
             "resultType": "FAILED",
-            "eyeThrows": [{ "correctionIncrements": 0 }],
+            "eyeThrows": [{ "correctionIncrements": -1 }],
             "predictions": []
         }));
         let line = line(&failed, &InformationMessages::default());
 
-        assert_eq!(texts(&line), ["[boat]", "reset measurements"]);
+        assert_eq!(texts(&line), ["reset measurements"]);
     }
 
     #[test]
-    fn lists_warnings_but_not_info() {
-        let messages: InformationMessages = serde_json::from_value(json!({
-            "informationMessages": [
-                { "severity": "INFO", "type": "NEXT_THROW_DIRECTION" },
-                { "severity": "WARNING", "type": "MISMEASURE" },
-                { "severity": "ERROR", "type": "PORTAL_LINKING" }
-            ]
-        }))
-        .unwrap();
-        let line = line(&Stronghold::default(), &messages);
+    fn fatal_messages_hide_the_data_and_the_boat() {
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "MC_VERSION", "message": "" },
+            { "severity": "ERROR", "type": "SOMETHING_NEW", "message": "" },
+            { "severity": "WARNING", "type": "PORTAL_LINKING", "message": "" }
+        ]));
+        let line = line(&triangulated(false), &messages);
 
-        assert_eq!(texts(&line), ["[boat]", "mismeasure", "portal linking"]);
+        assert_eq!(texts(&line), ["wrong minecraft version", "something new"]);
         assert_eq!(
-            line.segments[2].pieces[0],
-            Piece::text("portal linking", Palette::Error)
+            line.segments[0].pieces[0],
+            Piece::text("wrong minecraft version", Palette::Error)
         );
+    }
+
+    #[test]
+    fn mismeasure_keeps_the_adjustment() {
+        let messages = messages(json!([
+            { "severity": "WARNING", "type": "MISMEASURE", "message": "" }
+        ]));
+        let line = line(&triangulated(false), &messages);
+
+        assert_eq!(texts(&line), ["mismeasure", "-2"]);
     }
 }
