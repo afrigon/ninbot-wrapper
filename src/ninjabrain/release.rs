@@ -6,29 +6,16 @@ use anyhow::Context;
 use anyhow::Result;
 use directories::ProjectDirs;
 use reqwest::Client;
-use serde::Deserialize;
 use tempfile::NamedTempFile;
 use tracing::info;
-use tracing::warn;
 
-const LATEST_RELEASE_URL: &str =
-    "https://api.github.com/repos/Ninjabrain1/Ninjabrain-Bot/releases/latest";
-const JAR_EXTENSION: &str = "jar";
+// Speedrun rules whitelist specific Ninjabrain Bot versions, so the version only changes deliberately.
+const VERSION: &str = "1.5.2";
+const DOWNLOAD_URL: &str = "https://github.com/Ninjabrain1/Ninjabrain-Bot/releases/download";
 
 pub struct Release {
     client: Client,
     cache: PathBuf
-}
-
-#[derive(Deserialize)]
-struct GithubRelease {
-    assets: Vec<GithubAsset>
-}
-
-#[derive(Deserialize)]
-struct GithubAsset {
-    name: String,
-    browser_download_url: String
 }
 
 impl Release {
@@ -43,43 +30,18 @@ impl Release {
     }
 
     pub async fn jar(&self) -> Result<PathBuf> {
-        match self.latest().await {
-            Ok(jar) => Ok(jar),
-            Err(error) => {
-                warn!("could not fetch the latest Ninjabrain Bot release: {error:#}");
-                self.newest_cached()
-                    .context("no cached Ninjabrain Bot release to fall back on")
-            }
-        }
-    }
-
-    async fn latest(&self) -> Result<PathBuf> {
-        let release: GithubRelease = self
-            .client
-            .get(LATEST_RELEASE_URL)
-            .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await?;
-
-        let asset = release
-            .assets
-            .into_iter()
-            .find(|asset| asset.name.ends_with(&format!(".{JAR_EXTENSION}")))
-            .context("latest release has no jar asset")?;
-
-        let jar = self.cache.join(&asset.name);
+        let name = format!("Ninjabrain-Bot-{VERSION}.jar");
+        let jar = self.cache.join(&name);
 
         if jar.exists() {
             return Ok(jar);
         }
 
-        info!("downloading {}", asset.name);
+        info!("downloading {name}");
 
         let bytes = self
             .client
-            .get(&asset.browser_download_url)
+            .get(format!("{DOWNLOAD_URL}/{VERSION}/{name}"))
             .send()
             .await?
             .error_for_status()?
@@ -92,21 +54,5 @@ impl Release {
         file.persist(&jar)?;
 
         Ok(jar)
-    }
-
-    fn newest_cached(&self) -> Option<PathBuf> {
-        fs::read_dir(&self.cache)
-            .ok()?
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .filter(|path| {
-                path.extension()
-                    .is_some_and(|extension| extension == JAR_EXTENSION)
-            })
-            .max_by_key(|path| {
-                path.metadata()
-                    .and_then(|metadata| metadata.modified())
-                    .ok()
-            })
     }
 }

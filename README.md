@@ -10,7 +10,7 @@ The line is only drawn while the player is in a world and unpaused; otherwise th
 mise use -g github:afrigon/ninbot-wrapper
 ```
 
-A Java runtime must be on `PATH`. The latest Ninjabrain Bot release is downloaded from GitHub on every start and cached in the user cache directory; the newest cached jar is used when GitHub is unreachable. The bot's API must be enabled in its settings.
+A Java runtime must be on `PATH`. Ninjabrain Bot is pinned to version 1.5.2, because the speedrun rules only whitelist specific versions (A.11.7.a); it is downloaded from GitHub on first start and cached in the user cache directory. The bot's API must be enabled in its settings.
 
 ## Usage
 
