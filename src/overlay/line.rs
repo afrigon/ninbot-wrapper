@@ -13,6 +13,8 @@ use crate::ninjabrain::Stronghold;
 const HIGH_CERTAINTY: f64 = 0.95;
 const MEDIUM_CERTAINTY: f64 = 0.9;
 const STRONGHOLD_Y: i32 = 40;
+const PERCENT: f64 = 100.0;
+const DECIMAL_SHIFT: f64 = 10.0;
 const SEPARATOR: &str = "|";
 const LEFT_TURN_ARROW: &str = "< ";
 const RIGHT_TURN_ARROW: &str = " >";
@@ -151,7 +153,7 @@ impl Line {
 
         if let Some(prediction) = stronghold.prediction() {
             segments.push(Segment::text(
-                format!("{:.1}%", prediction.certainty * 100.0),
+                format!("{:.1}%", Self::percentage(prediction.certainty)),
                 Self::certainty_color(prediction.certainty)
             ));
         }
@@ -213,6 +215,11 @@ impl Line {
             ),
             Palette::Text
         ))
+    }
+
+    // Matches the bot's Java formatting, which rounds ties up rather than to even.
+    fn percentage(fraction: f64) -> f64 {
+        (fraction * PERCENT * DECIMAL_SHIFT).round() / DECIMAL_SHIFT
     }
 
     fn sign_color(value: i32) -> Palette {
@@ -392,6 +399,15 @@ mod tests {
                 "-2"
             ]
         );
+    }
+
+    #[test]
+    fn rounds_certainty_ties_up_like_the_bot() {
+        let mut stronghold = triangulated(false);
+        stronghold.predictions[0].certainty = 0.9625;
+        let line = line(&stronghold, &InformationMessages::default());
+
+        assert_eq!(texts(&line)[5], "96.3%");
     }
 
     #[test]
