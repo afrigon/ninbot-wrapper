@@ -64,7 +64,7 @@ impl Renderer {
     fn width(&self, piece: &Piece) -> u32 {
         match piece {
             Piece::Text { text, .. } | Piece::Hidden(text) => Self::text_width(text),
-            Piece::Boat(_) => Self::advance(Glyph::dot()) * SCALE
+            Piece::Boat(_) => CONTENT_HEIGHT
         }
     }
 
@@ -88,6 +88,7 @@ impl Renderer {
             }
             Piece::Hidden(_) => {}
             Piece::Boat(state) => {
+                let x = x + (CONTENT_HEIGHT - Glyph::dot().width() * SCALE) / 2;
                 Self::draw_glyph(
                     pixmap,
                     Glyph::dot(),
