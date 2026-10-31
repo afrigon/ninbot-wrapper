@@ -30,7 +30,7 @@ impl Service {
 
     pub async fn run(self) -> Result<()> {
         let client = Client::builder().user_agent(USER_AGENT).build()?;
-        let renderer = Renderer::new()?;
+        let renderer = Renderer::new();
         let mut writer = FrameWriter::new(self.arguments.output.clone())?;
         let Some(_lock) = InstanceLock::acquire(&self.arguments.output)? else {
             info!(

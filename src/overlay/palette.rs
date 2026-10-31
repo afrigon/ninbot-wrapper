@@ -14,6 +14,10 @@ pub enum Palette {
     LowCertainty,
     Warning,
     Error,
+    BoatNone,
+    BoatMeasuring,
+    BoatValid,
+    BoatError,
     Turn(u8)
 }
 
@@ -22,12 +26,16 @@ impl Palette {
         match self {
             Self::Background => Color::from_rgba8(90, 90, 90, 102),
             Self::Text => Color::from_rgba8(0xe0, 0xe0, 0xe0, 0xff),
-            Self::Positive | Self::HighCertainty => Color::from_rgba8(0x9e, 0xe8, 0x9e, 0xff),
-            Self::Negative | Self::LowCertainty | Self::Error => {
+            Self::Positive | Self::HighCertainty | Self::BoatValid => {
+                Color::from_rgba8(0x9e, 0xe8, 0x9e, 0xff)
+            }
+            Self::Negative | Self::LowCertainty | Self::Error | Self::BoatError => {
                 Color::from_rgba8(0xff, 0x9e, 0x9e, 0xff)
             }
             Self::MediumCertainty => Color::from_rgba8(0xd6, 0xe8, 0x9e, 0xff),
             Self::Warning => Color::from_rgba8(0xe8, 0xd6, 0x9e, 0xff),
+            Self::BoatNone => Color::from_rgba8(0x9a, 0x9a, 0x9a, 0xff),
+            Self::BoatMeasuring => Color::from_rgba8(0x9e, 0xc8, 0xff, 0xff),
             Self::Turn(degrees) => Self::turn(degrees)
         }
     }

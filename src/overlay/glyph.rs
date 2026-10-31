@@ -67,6 +67,10 @@ impl Glyph {
         }
     }
 
+    pub fn dot() -> &'static Glyph {
+        &DOT
+    }
+
     pub fn width(&self) -> u32 {
         self.rows[0].len() as u32
     }
@@ -655,6 +659,18 @@ const GREATER_THAN: Glyph = Glyph::new([
     "..#.",
     ".#..",
     "#...",
+    "....",
+]);
+
+#[rustfmt::skip]
+const DOT: Glyph = Glyph::new([
+    "....",
+    "....",
+    ".##.",
+    "####",
+    "####",
+    ".##.",
+    "....",
     "....",
 ]);
 

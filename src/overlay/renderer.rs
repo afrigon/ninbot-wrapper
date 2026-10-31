@@ -2,7 +2,6 @@ use anyhow::Context;
 use anyhow::Result;
 use tiny_skia::Paint;
 use tiny_skia::Pixmap;
-use tiny_skia::PixmapPaint;
 use tiny_skia::Rect;
 use tiny_skia::Transform;
 
@@ -22,21 +21,11 @@ const PADDING_LEFT: u32 = 3;
 const CONTENT_HEIGHT: u32 = Glyph::HEIGHT * SCALE;
 const EMPTY_SIZE: u32 = 1;
 
-pub struct Renderer {
-    boat_none: Pixmap,
-    boat_measuring: Pixmap,
-    boat_valid: Pixmap,
-    boat_error: Pixmap
-}
+pub struct Renderer;
 
 impl Renderer {
-    pub fn new() -> Result<Self> {
-        Ok(Self {
-            boat_none: Pixmap::decode_png(include_bytes!("../../assets/boat/none.png"))?,
-            boat_measuring: Pixmap::decode_png(include_bytes!("../../assets/boat/measuring.png"))?,
-            boat_valid: Pixmap::decode_png(include_bytes!("../../assets/boat/valid.png"))?,
-            boat_error: Pixmap::decode_png(include_bytes!("../../assets/boat/error.png"))?
-        })
+    pub fn new() -> Self {
+        Self
     }
 
     pub fn render(&self, line: &Line) -> Result<Vec<u8>> {
@@ -75,7 +64,7 @@ impl Renderer {
     fn width(&self, piece: &Piece) -> u32 {
         match piece {
             Piece::Text { text, .. } | Piece::Hidden(text) => Self::text_width(text),
-            Piece::Boat(state) => self.boat(*state).width()
+            Piece::Boat(_) => Self::advance(Glyph::dot()) * SCALE
         }
     }
 
@@ -88,10 +77,7 @@ impl Renderer {
     fn draw(&self, pixmap: &mut Pixmap, piece: &Piece, x: u32, y: u32) {
         match piece {
             Piece::Text { text, color } => {
-                let mut paint = Paint::default();
-                paint.set_color(color.color());
-                paint.anti_alias = false;
-
+                let paint = Self::paint(*color);
                 let mut x = x;
 
                 for character in text.chars() {
@@ -102,16 +88,12 @@ impl Renderer {
             }
             Piece::Hidden(_) => {}
             Piece::Boat(state) => {
-                let icon = self.boat(*state);
-                let y = y + (CONTENT_HEIGHT - icon.height()) / 2;
-
-                pixmap.draw_pixmap(
-                    x as i32,
-                    y as i32,
-                    icon.as_ref(),
-                    &PixmapPaint::default(),
-                    Transform::identity(),
-                    None
+                Self::draw_glyph(
+                    pixmap,
+                    Glyph::dot(),
+                    &Self::paint(Self::boat_color(*state)),
+                    x,
+                    y
                 );
             }
         }
@@ -136,12 +118,19 @@ impl Renderer {
         glyph.width() + GLYPH_SPACING
     }
 
-    fn boat(&self, state: BoatState) -> &Pixmap {
+    fn paint(color: Palette) -> Paint<'static> {
+        let mut paint = Paint::default();
+        paint.set_color(color.color());
+        paint.anti_alias = false;
+        paint
+    }
+
+    fn boat_color(state: BoatState) -> Palette {
         match state {
-            BoatState::None => &self.boat_none,
-            BoatState::Measuring => &self.boat_measuring,
-            BoatState::Valid => &self.boat_valid,
-            BoatState::Error => &self.boat_error
+            BoatState::None => Palette::BoatNone,
+            BoatState::Measuring => Palette::BoatMeasuring,
+            BoatState::Valid => Palette::BoatValid,
+            BoatState::Error => Palette::BoatError
         }
     }
 }
@@ -152,7 +141,7 @@ mod tests {
 
     #[test]
     fn hidden_text_reserves_the_width_of_the_visible_text() {
-        let renderer = Renderer::new().unwrap();
+        let renderer = Renderer::new();
 
         assert_eq!(
             renderer.width(&Piece::Hidden("< ".to_string())),
