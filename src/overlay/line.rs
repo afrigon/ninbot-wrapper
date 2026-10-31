@@ -1,3 +1,4 @@
+use super::Backdrop;
 use super::Palette;
 use super::Piece;
 use super::Segment;
@@ -38,7 +39,8 @@ impl Route {
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Line {
-    pub segments: Vec<Segment>
+    pub segments: Vec<Segment>,
+    pub backdrop: Backdrop
 }
 
 impl Line {
@@ -53,7 +55,10 @@ impl Line {
         }
 
         if let Some(segments) = Self::fatal(stronghold, messages) {
-            return Self { segments };
+            return Self {
+                segments,
+                backdrop: Backdrop::Panel
+            };
         }
 
         let dimension = stronghold
@@ -66,13 +71,18 @@ impl Line {
                 Self::overworld_sections(stronghold, messages, Route::reported_by(messages))
             }
         };
-        let mut segments = vec![Self::boat(boat)];
-
-        for (index, section) in sections
+        let sections = sections
             .into_iter()
             .filter(|section| !section.is_empty())
-            .enumerate()
-        {
+            .collect::<Vec<_>>();
+        let backdrop = if sections.is_empty() {
+            Backdrop::Transparent
+        } else {
+            Backdrop::Panel
+        };
+        let mut segments = vec![Self::boat(boat)];
+
+        for (index, section) in sections.into_iter().enumerate() {
             if index > 0 {
                 segments.push(Segment::text(SEPARATOR, Palette::Text));
             }
@@ -80,7 +90,7 @@ impl Line {
             segments.extend(section);
         }
 
-        Self { segments }
+        Self { segments, backdrop }
     }
 
     pub fn is_empty(&self) -> bool {
@@ -349,6 +359,15 @@ mod tests {
         let line = line(&Stronghold::default(), &InformationMessages::default());
 
         assert_eq!(texts(&line), ["[boat]"]);
+    }
+
+    #[test]
+    fn only_the_boat_has_no_backdrop() {
+        let boat_only = line(&Stronghold::default(), &InformationMessages::default());
+        let measured = line(&triangulated(false), &InformationMessages::default());
+
+        assert_eq!(boat_only.backdrop, Backdrop::Transparent);
+        assert_eq!(measured.backdrop, Backdrop::Panel);
     }
 
     fn messages(value: serde_json::Value) -> InformationMessages {

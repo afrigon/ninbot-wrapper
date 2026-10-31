@@ -13,6 +13,7 @@ use crate::ninjabrain::EventStream;
 use crate::ninjabrain::InformationMessages;
 use crate::ninjabrain::Release;
 use crate::ninjabrain::Stronghold;
+use crate::overlay::Frame;
 use crate::overlay::FrameWriter;
 use crate::overlay::Line;
 use crate::overlay::Renderer;
@@ -39,7 +40,7 @@ impl Service {
             );
             return Ok(());
         };
-        writer.write(renderer.render(&Line::default())?)?;
+        writer.write(Frame::Empty)?;
 
         let jar = Release::new(client.clone())?.jar().await?;
         let mut bot = BotProcess::spawn(&jar)?;
@@ -83,7 +84,7 @@ impl Service {
             }
         }
 
-        writer.write(renderer.render(&Line::default())?)
+        writer.write(Frame::Empty)
     }
 
     #[cfg(unix)]

@@ -5,6 +5,8 @@ use tiny_skia::Pixmap;
 use tiny_skia::Rect;
 use tiny_skia::Transform;
 
+use super::Backdrop;
+use super::Frame;
 use super::Glyph;
 use super::Line;
 use super::Palette;
@@ -19,7 +21,6 @@ const PADDING_RIGHT: u32 = 3;
 const PADDING_BOTTOM: u32 = 0;
 const PADDING_LEFT: u32 = 3;
 const CONTENT_HEIGHT: u32 = Glyph::HEIGHT * SCALE;
-const EMPTY_SIZE: u32 = 1;
 
 pub struct Renderer;
 
@@ -28,10 +29,9 @@ impl Renderer {
         Self
     }
 
-    pub fn render(&self, line: &Line) -> Result<Vec<u8>> {
+    pub fn render(&self, line: &Line) -> Result<Frame> {
         if line.is_empty() {
-            let pixmap = Pixmap::new(EMPTY_SIZE, EMPTY_SIZE).context("empty frame")?;
-            return Ok(pixmap.encode_png()?);
+            return Ok(Frame::Empty);
         }
 
         let pieces = line.segments.iter().map(|segment| {
@@ -45,7 +45,11 @@ impl Renderer {
         let width = PADDING_LEFT + content_width + PADDING_RIGHT;
         let height = PADDING_TOP + CONTENT_HEIGHT + PADDING_BOTTOM;
         let mut pixmap = Pixmap::new(width, height).context("frame size")?;
-        pixmap.fill(Palette::Background.color());
+
+        match line.backdrop {
+            Backdrop::Panel => pixmap.fill(Palette::Background.color()),
+            Backdrop::Transparent => {}
+        }
 
         let mut x = PADDING_LEFT;
 
@@ -58,7 +62,7 @@ impl Renderer {
             x += SEGMENT_GAP;
         }
 
-        Ok(pixmap.encode_png()?)
+        Ok(Frame::Image(pixmap.encode_png()?))
     }
 
     fn width(&self, piece: &Piece) -> u32 {
