@@ -1,7 +1,6 @@
 use super::Palette;
 use super::Piece;
 use super::Segment;
-use super::Weight;
 use crate::game::GameState;
 use crate::ninjabrain::Boat;
 use crate::ninjabrain::Dimension;
@@ -51,7 +50,7 @@ impl Line {
             .enumerate()
         {
             if index > 0 {
-                segments.push(Segment::text(SEPARATOR, Palette::Text, Weight::Regular));
+                segments.push(Segment::text(SEPARATOR, Palette::Text));
             }
 
             segments.extend(section);
@@ -80,8 +79,7 @@ impl Line {
                             prediction.distance(),
                             prediction.nether_distance()
                         ),
-                        Palette::Text,
-                        Weight::Regular
+                        Palette::Text
                     )
                 })
                 .into_iter()
@@ -99,11 +97,7 @@ impl Line {
             prediction.map(Self::coordinates).into_iter().collect(),
             prediction
                 .map(|prediction| {
-                    Segment::text(
-                        prediction.nether_distance().to_string(),
-                        Palette::Text,
-                        Weight::Regular
-                    )
+                    Segment::text(prediction.nether_distance().to_string(), Palette::Text)
                 })
                 .into_iter()
                 .collect(),
@@ -112,24 +106,19 @@ impl Line {
     }
 
     fn boat(boat: &Boat) -> Segment {
-        Segment::new(vec![
-            Piece::text(" ", Palette::Text, Weight::Regular),
-            Piece::Boat(boat.boat_state),
-            Piece::text(" ", Palette::Text, Weight::Regular),
-        ])
+        Segment::new(vec![Piece::Boat(boat.boat_state)])
     }
 
     fn coordinates(prediction: &Prediction) -> Segment {
         Segment::new(vec![
-            Piece::text(" ", Palette::Text, Weight::Regular),
             Self::coordinate(prediction.nether_x()),
-            Piece::text(format!(" {STRONGHOLD_Y} "), Palette::Text, Weight::Regular),
+            Piece::text(format!(" {STRONGHOLD_Y} "), Palette::Text),
             Self::coordinate(prediction.nether_z()),
         ])
     }
 
     fn coordinate(value: i32) -> Piece {
-        Piece::text(value.to_string(), Self::sign_color(value), Weight::Bold)
+        Piece::text(value.to_string(), Self::sign_color(value))
     }
 
     fn turn(stronghold: &Stronghold) -> Option<Segment> {
@@ -143,7 +132,7 @@ impl Line {
             format!("< {degrees}")
         };
 
-        Some(Segment::text(text, Palette::Turn(degrees), Weight::Regular))
+        Some(Segment::text(text, Palette::Turn(degrees)))
     }
 
     fn accuracy(stronghold: &Stronghold) -> Vec<Segment> {
@@ -152,8 +141,7 @@ impl Line {
         if let Some(prediction) = stronghold.prediction() {
             segments.push(Segment::text(
                 format!("{:.1}%", prediction.certainty * 100.0),
-                Self::certainty_color(prediction.certainty),
-                Weight::Regular
+                Self::certainty_color(prediction.certainty)
             ));
         }
 
@@ -162,8 +150,7 @@ impl Line {
         if correction != 0 {
             segments.push(Segment::text(
                 format!("{correction:+}"),
-                Self::sign_color(correction),
-                Weight::Bold
+                Self::sign_color(correction)
             ));
         }
 
@@ -175,11 +162,7 @@ impl Line {
         let failed = stronghold.result_type == ResultType::Failed;
 
         if failed || (stronghold.throws() > 0 && stronghold.predictions.is_empty()) {
-            segments.push(Segment::text(
-                "reset measurements",
-                Palette::Error,
-                Weight::Bold
-            ));
+            segments.push(Segment::text("reset measurements", Palette::Error));
         }
 
         for message in messages.warnings() {
@@ -187,7 +170,7 @@ impl Line {
                 Severity::Error => Palette::Error,
                 Severity::Warning | Severity::Info => Palette::Warning
             };
-            segments.push(Segment::text(message.label(), color, Weight::Bold));
+            segments.push(Segment::text(message.label(), color));
         }
 
         segments
@@ -285,7 +268,7 @@ mod tests {
     fn shows_only_the_boat_without_data() {
         let line = line(&Stronghold::default(), &InformationMessages::default());
 
-        assert_eq!(texts(&line), [" [boat] "]);
+        assert_eq!(texts(&line), ["[boat]"]);
     }
 
     #[test]
@@ -299,8 +282,8 @@ mod tests {
         assert_eq!(
             texts(&line),
             [
-                " [boat] ",
-                " -24 40 170",
+                "[boat]",
+                "-24 40 170",
                 "|",
                 "1530 (191)",
                 "|",
@@ -314,7 +297,7 @@ mod tests {
         );
         assert_eq!(
             line.segments[5].pieces[0],
-            Piece::text("  8 >", Palette::Turn(8), Weight::Regular)
+            Piece::text("  8 >", Palette::Turn(8))
         );
     }
 
@@ -328,7 +311,7 @@ mod tests {
 
         assert_eq!(
             texts(&line),
-            [" [boat] ", " -24 40 170", "|", "191", "|", "  8 >"]
+            ["[boat]", "-24 40 170", "|", "191", "|", "  8 >"]
         );
     }
 
@@ -354,8 +337,8 @@ mod tests {
         assert_eq!(
             texts(&line),
             [
-                " [boat] ",
-                " -24 40 170",
+                "[boat]",
+                "-24 40 170",
                 "|",
                 "1530 (191)",
                 "|",
@@ -374,7 +357,7 @@ mod tests {
         }));
         let line = line(&failed, &InformationMessages::default());
 
-        assert_eq!(texts(&line), [" [boat] ", "reset measurements"]);
+        assert_eq!(texts(&line), ["[boat]", "reset measurements"]);
     }
 
     #[test]
@@ -389,10 +372,10 @@ mod tests {
         .unwrap();
         let line = line(&Stronghold::default(), &messages);
 
-        assert_eq!(texts(&line), [" [boat] ", "mismeasure", "portal linking"]);
+        assert_eq!(texts(&line), ["[boat]", "mismeasure", "portal linking"]);
         assert_eq!(
             line.segments[2].pieces[0],
-            Piece::text("portal linking", Palette::Error, Weight::Bold)
+            Piece::text("portal linking", Palette::Error)
         );
     }
 }

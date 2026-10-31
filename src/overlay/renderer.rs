@@ -10,7 +10,6 @@ use super::Glyph;
 use super::Line;
 use super::Palette;
 use super::Piece;
-use super::Weight;
 use crate::ninjabrain::BoatState;
 
 const SCALE: u32 = 3;
@@ -75,9 +74,9 @@ impl Renderer {
 
     fn width(&self, piece: &Piece) -> u32 {
         match piece {
-            Piece::Text { text, weight, .. } => text
+            Piece::Text { text, .. } => text
                 .chars()
-                .map(|character| Self::advance(Glyph::of(character), *weight) * SCALE)
+                .map(|character| Self::advance(Glyph::of(character)) * SCALE)
                 .sum(),
             Piece::Boat(state) => self.boat(*state).width()
         }
@@ -85,11 +84,7 @@ impl Renderer {
 
     fn draw(&self, pixmap: &mut Pixmap, piece: &Piece, x: u32, y: u32) {
         match piece {
-            Piece::Text {
-                text,
-                color,
-                weight
-            } => {
+            Piece::Text { text, color } => {
                 let mut paint = Paint::default();
                 paint.set_color(color.color());
                 paint.anti_alias = false;
@@ -99,12 +94,7 @@ impl Renderer {
                 for character in text.chars() {
                     let glyph = Glyph::of(character);
                     Self::draw_glyph(pixmap, glyph, &paint, x, y);
-
-                    if *weight == Weight::Bold {
-                        Self::draw_glyph(pixmap, glyph, &paint, x + SCALE, y);
-                    }
-
-                    x += Self::advance(glyph, *weight) * SCALE;
+                    x += Self::advance(glyph) * SCALE;
                 }
             }
             Piece::Boat(state) => {
@@ -138,13 +128,8 @@ impl Renderer {
         }
     }
 
-    fn advance(glyph: &Glyph, weight: Weight) -> u32 {
-        let bold = match weight {
-            Weight::Regular => 0,
-            Weight::Bold => 1
-        };
-
-        glyph.width() + GLYPH_SPACING + bold
+    fn advance(glyph: &Glyph) -> u32 {
+        glyph.width() + GLYPH_SPACING
     }
 
     fn boat(&self, state: BoatState) -> &Pixmap {

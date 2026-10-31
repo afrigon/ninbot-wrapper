@@ -5,7 +5,6 @@ mod palette;
 mod piece;
 mod renderer;
 mod segment;
-mod weight;
 
 pub use frame_writer::FrameWriter;
 pub use glyph::Glyph;
@@ -14,4 +13,3 @@ pub use palette::Palette;
 pub use piece::Piece;
 pub use renderer::Renderer;
 pub use segment::Segment;
-pub use weight::Weight;

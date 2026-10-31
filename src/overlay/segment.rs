@@ -1,6 +1,5 @@
 use super::Palette;
 use super::Piece;
-use super::Weight;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Segment {
@@ -12,7 +11,7 @@ impl Segment {
         Self { pieces }
     }
 
-    pub fn text(text: impl Into<String>, color: Palette, weight: Weight) -> Self {
-        Self::new(vec![Piece::text(text, color, weight)])
+    pub fn text(text: impl Into<String>, color: Palette) -> Self {
+        Self::new(vec![Piece::text(text, color)])
     }
 }
