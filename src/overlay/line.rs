@@ -4,7 +4,9 @@ use super::Segment;
 use super::Weight;
 use crate::game::GameState;
 use crate::ninjabrain::Boat;
+use crate::ninjabrain::Dimension;
 use crate::ninjabrain::InformationMessages;
+use crate::ninjabrain::PlayerPosition;
 use crate::ninjabrain::Prediction;
 use crate::ninjabrain::ResultType;
 use crate::ninjabrain::Severity;
@@ -12,7 +14,8 @@ use crate::ninjabrain::Stronghold;
 
 const HIGH_CERTAINTY: f64 = 0.95;
 const MEDIUM_CERTAINTY: f64 = 0.9;
-const STRONGHOLD_NETHER_Y: &str = "40.00000";
+const STRONGHOLD_Y: i32 = 40;
+const SEPARATOR: &str = "|";
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Line {
@@ -30,20 +33,28 @@ impl Line {
             return Self::default();
         }
 
-        let prediction = stronghold.prediction();
-        let has_details = stronghold.throws() > 0 || messages.warnings().next().is_some();
+        let dimension = stronghold
+            .player_position
+            .as_ref()
+            .map(PlayerPosition::dimension);
+        let sections = match dimension {
+            Some(Dimension::Nether) => Self::nether_sections(stronghold),
+            Some(Dimension::Overworld | Dimension::End) | None => {
+                Self::overworld_sections(stronghold, messages)
+            }
+        };
         let mut segments = vec![Self::boat(boat)];
 
-        if let Some(prediction) = prediction {
-            segments.push(Self::coordinates(prediction));
-
-            if has_details {
-                segments.push(Segment::text("|", Palette::Text, Weight::Regular));
+        for (index, section) in sections
+            .into_iter()
+            .filter(|section| !section.is_empty())
+            .enumerate()
+        {
+            if index > 0 {
+                segments.push(Segment::text(SEPARATOR, Palette::Text, Weight::Regular));
             }
-        }
 
-        if has_details {
-            segments.extend(Self::details(stronghold, prediction, messages));
+            segments.extend(section);
         }
 
         Self { segments }
@@ -51,6 +62,53 @@ impl Line {
 
     pub fn is_empty(&self) -> bool {
         self.segments.is_empty()
+    }
+
+    fn overworld_sections(
+        stronghold: &Stronghold,
+        messages: &InformationMessages
+    ) -> Vec<Vec<Segment>> {
+        let prediction = stronghold.prediction();
+
+        vec![
+            prediction.map(Self::coordinates).into_iter().collect(),
+            prediction
+                .map(|prediction| {
+                    Segment::text(
+                        format!(
+                            "{} ({})",
+                            prediction.distance(),
+                            prediction.nether_distance()
+                        ),
+                        Palette::Text,
+                        Weight::Regular
+                    )
+                })
+                .into_iter()
+                .collect(),
+            Self::turn(stronghold).into_iter().collect(),
+            Self::accuracy(stronghold),
+            Self::errors(stronghold, messages),
+        ]
+    }
+
+    fn nether_sections(stronghold: &Stronghold) -> Vec<Vec<Segment>> {
+        let prediction = stronghold.prediction();
+
+        vec![
+            prediction.map(Self::coordinates).into_iter().collect(),
+            prediction
+                .map(|prediction| {
+                    Segment::text(
+                        prediction.nether_distance().to_string(),
+                        Palette::Text,
+                        Weight::Regular
+                    )
+                })
+                .into_iter()
+                .collect(),
+            Self::turn(stronghold).into_iter().collect(),
+        ]
     }
 
     fn boat(boat: &Boat) -> Segment {
@@ -65,43 +123,36 @@ impl Line {
         Segment::new(vec![
             Piece::text(" ", Palette::Text, Weight::Regular),
             Self::coordinate(prediction.nether_x()),
-            Piece::text(
-                format!(" / {STRONGHOLD_NETHER_Y} / "),
-                Palette::Text,
-                Weight::Regular
-            ),
+            Piece::text(format!(" {STRONGHOLD_Y} "), Palette::Text, Weight::Regular),
             Self::coordinate(prediction.nether_z()),
         ])
     }
 
     fn coordinate(value: i32) -> Piece {
-        Piece::text(
-            format!("{value}.000"),
-            Self::sign_color(value),
-            Weight::Bold
-        )
+        Piece::text(value.to_string(), Self::sign_color(value), Weight::Bold)
     }
 
-    fn details(
-        stronghold: &Stronghold,
-        prediction: Option<&Prediction>,
-        messages: &InformationMessages
-    ) -> Vec<Segment> {
+    fn turn(stronghold: &Stronghold) -> Option<Segment> {
+        let prediction = stronghold.prediction()?;
+        let player = stronghold.player_position.as_ref()?;
+        let turn = prediction.turn_angle(player);
+        let degrees = turn.abs().round() as u8;
+        let text = if turn > 0.0 {
+            format!("  {degrees} >")
+        } else {
+            format!("< {degrees}")
+        };
+
+        Some(Segment::text(text, Palette::Turn(degrees), Weight::Regular))
+    }
+
+    fn accuracy(stronghold: &Stronghold) -> Vec<Segment> {
         let mut segments = Vec::new();
 
-        if let Some(prediction) = prediction {
+        if let Some(prediction) = stronghold.prediction() {
             segments.push(Segment::text(
                 format!("{:.1}%", prediction.certainty * 100.0),
                 Self::certainty_color(prediction.certainty),
-                Weight::Regular
-            ));
-            segments.push(Segment::text(
-                format!(
-                    "{} ({})",
-                    prediction.distance(),
-                    prediction.nether_distance()
-                ),
-                Palette::Text,
                 Weight::Regular
             ));
         }
@@ -116,14 +167,11 @@ impl Line {
             ));
         }
 
-        if stronghold.throws() > 0 {
-            segments.push(Segment::text(
-                format!("t: {}", stronghold.throws()),
-                Palette::Meta,
-                Weight::Regular
-            ));
-        }
+        segments
+    }
 
+    fn errors(stronghold: &Stronghold, messages: &InformationMessages) -> Vec<Segment> {
+        let mut segments = Vec::new();
         let failed = stronghold.result_type == ResultType::Failed;
 
         if failed || (stronghold.throws() > 0 && stronghold.predictions.is_empty()) {
@@ -178,14 +226,21 @@ mod tests {
         serde_json::from_value(value).unwrap()
     }
 
-    fn triangulated() -> Stronghold {
+    fn triangulated(in_nether: bool) -> Stronghold {
         stronghold(json!({
             "resultType": "TRIANGULATION",
             "eyeThrows": [{ "correctionIncrements": 0 }, { "correctionIncrements": -2 }],
             "predictions": [
                 { "chunkX": -12, "chunkZ": 85, "certainty": 0.9634, "overworldDistance": 1530.7 },
                 { "chunkX": 10, "chunkZ": 80, "certainty": 0.02, "overworldDistance": 1700.0 }
-            ]
+            ],
+            "playerPosition": {
+                "xInOverworld": 0.0,
+                "zInOverworld": 0.0,
+                "horizontalAngle": 0.0,
+                "isInOverworld": !in_nether,
+                "isInNether": in_nether
+            }
         }))
     }
 
@@ -205,72 +260,121 @@ mod tests {
             .collect()
     }
 
+    fn line(stronghold: &Stronghold, messages: &InformationMessages) -> Line {
+        Line::new(
+            stronghold,
+            &Boat {
+                boat_state: BoatState::Valid
+            },
+            messages,
+            Some(&PLAYING)
+        )
+    }
+
     #[test]
     fn hidden_unless_playing() {
         let paused = GameState::InWorld(InWorldState::Paused);
         let empty = InformationMessages::default();
         let boat = Boat::default();
 
-        assert!(Line::new(&triangulated(), &boat, &empty, Some(&paused)).is_empty());
-        assert!(Line::new(&triangulated(), &boat, &empty, None).is_empty());
+        assert!(Line::new(&triangulated(false), &boat, &empty, Some(&paused)).is_empty());
+        assert!(Line::new(&triangulated(false), &boat, &empty, None).is_empty());
     }
 
     #[test]
     fn shows_only_the_boat_without_data() {
-        let line = Line::new(
-            &Stronghold::default(),
-            &Boat::default(),
-            &InformationMessages::default(),
-            Some(&PLAYING)
-        );
+        let line = line(&Stronghold::default(), &InformationMessages::default());
 
         assert_eq!(texts(&line), [" [boat] "]);
     }
 
     #[test]
-    fn shows_triangulation_details() {
-        let line = Line::new(
-            &triangulated(),
-            &Boat {
-                boat_state: BoatState::Valid
-            },
-            &InformationMessages::default(),
-            Some(&PLAYING)
-        );
+    fn shows_every_section_after_an_overworld_measurement() {
+        let messages: InformationMessages = serde_json::from_value(json!({
+            "informationMessages": [{ "severity": "WARNING", "type": "MISMEASURE" }]
+        }))
+        .unwrap();
+        let line = line(&triangulated(false), &messages);
 
         assert_eq!(
             texts(&line),
             [
                 " [boat] ",
-                " -24.000 / 40.00000 / 170.000",
+                " -24 40 170",
+                "|",
+                "1530 (191)",
+                "|",
+                "  8 >",
                 "|",
                 "96.3%",
-                "1530 (191)",
                 "-2",
-                "t: 2"
+                "|",
+                "mismeasure"
             ]
         );
         assert_eq!(
-            line.segments[3].pieces[0],
-            Piece::text("96.3%", Palette::HighCertainty, Weight::Regular)
+            line.segments[5].pieces[0],
+            Piece::text("  8 >", Palette::Turn(8), Weight::Regular)
         );
     }
 
     #[test]
-    fn asks_for_reset_when_throws_give_no_prediction() {
+    fn shows_only_travel_details_after_a_nether_measurement() {
+        let messages: InformationMessages = serde_json::from_value(json!({
+            "informationMessages": [{ "severity": "WARNING", "type": "MISMEASURE" }]
+        }))
+        .unwrap();
+        let line = line(&triangulated(true), &messages);
+
+        assert_eq!(
+            texts(&line),
+            [" [boat] ", " -24 40 170", "|", "191", "|", "  8 >"]
+        );
+    }
+
+    #[test]
+    fn turns_left_with_the_arrow_first() {
+        let mut stronghold = triangulated(false);
+        stronghold
+            .player_position
+            .as_mut()
+            .unwrap()
+            .horizontal_angle = 90.0;
+        let line = line(&stronghold, &InformationMessages::default());
+
+        assert_eq!(texts(&line)[5], "< 82");
+    }
+
+    #[test]
+    fn omits_the_turn_without_a_player_position() {
+        let mut stronghold = triangulated(false);
+        stronghold.player_position = None;
+        let line = line(&stronghold, &InformationMessages::default());
+
+        assert_eq!(
+            texts(&line),
+            [
+                " [boat] ",
+                " -24 40 170",
+                "|",
+                "1530 (191)",
+                "|",
+                "96.3%",
+                "-2"
+            ]
+        );
+    }
+
+    #[test]
+    fn asks_for_reset_without_a_separator_after_the_boat() {
         let failed = stronghold(json!({
             "resultType": "FAILED",
             "eyeThrows": [{ "correctionIncrements": 0 }],
             "predictions": []
         }));
-        let line = Line::new(
-            &failed,
-            &Boat::default(),
-            &InformationMessages::default(),
-            Some(&PLAYING)
-        );
+        let line = line(&failed, &InformationMessages::default());
 
-        assert_eq!(texts(&line), [" [boat] ", "t: 1", "reset measurements"]);
+        assert_eq!(texts(&line), [" [boat] ", "reset measurements"]);
     }
 
     #[test]
@@ -283,12 +387,7 @@ mod tests {
             ]
         }))
         .unwrap();
-        let line = Line::new(
-            &Stronghold::default(),
-            &Boat::default(),
-            &messages,
-            Some(&PLAYING)
-        );
+        let line = line(&Stronghold::default(), &messages);
 
         assert_eq!(texts(&line), [" [boat] ", "mismeasure", "portal linking"]);
         assert_eq!(

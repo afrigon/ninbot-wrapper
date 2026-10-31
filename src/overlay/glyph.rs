@@ -1,4 +1,5 @@
 const ROWS: usize = 8;
+const WIDTH: u32 = 5;
 const LIT: u8 = b'#';
 
 #[derive(Debug, Clone, Copy)]
@@ -61,12 +62,14 @@ impl Glyph {
             '(' => &LEFT_PARENTHESIS,
             ')' => &RIGHT_PARENTHESIS,
             '|' => &VERTICAL_BAR,
+            '<' => &LESS_THAN,
+            '>' => &GREATER_THAN,
             _ => &MISSING
         }
     }
 
     pub fn width(&self) -> u32 {
-        self.rows[0].len() as u32
+        WIDTH
     }
 
     pub fn lit_pixels(&self) -> impl Iterator<Item = (u32, u32)> + '_ {
@@ -262,14 +265,14 @@ const E: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const F: Glyph = Glyph::new([
-    "..##",
-    ".#..",
-    "####",
-    ".#..",
-    ".#..",
-    ".#..",
-    ".#..",
-    "....",
+    "..##.",
+    ".#...",
+    "####.",
+    ".#...",
+    ".#...",
+    ".#...",
+    ".#...",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -298,14 +301,14 @@ const H: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const I: Glyph = Glyph::new([
-    "#",
-    ".",
-    "#",
-    "#",
-    "#",
-    "#",
-    "#",
-    ".",
+    "..#..",
+    ".....",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -322,26 +325,26 @@ const J: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const K: Glyph = Glyph::new([
-    "#...",
-    "#...",
-    "#..#",
-    "#.#.",
-    "##..",
-    "#.#.",
-    "#..#",
-    "....",
+    "#....",
+    "#....",
+    "#..#.",
+    "#.#..",
+    "##...",
+    "#.#..",
+    "#..#.",
+    ".....",
 ]);
 
 #[rustfmt::skip]
 const L: Glyph = Glyph::new([
-    "#.",
-    "#.",
-    "#.",
-    "#.",
-    "#.",
-    "#.",
-    ".#",
-    "..",
+    ".#...",
+    ".#...",
+    ".#...",
+    ".#...",
+    ".#...",
+    ".#...",
+    "..#..",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -430,14 +433,14 @@ const S: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const T: Glyph = Glyph::new([
-    ".#.",
-    ".#.",
-    "###",
-    ".#.",
-    ".#.",
-    ".#.",
-    "..#",
-    "...",
+    "..#..",
+    "..#..",
+    ".###.",
+    "..#..",
+    "..#..",
+    "..#..",
+    "...#.",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -514,38 +517,38 @@ const Z: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const SPACE: Glyph = Glyph::new([
-    "...",
-    "...",
-    "...",
-    "...",
-    "...",
-    "...",
-    "...",
-    "...",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
 ]);
 
 #[rustfmt::skip]
 const PERIOD: Glyph = Glyph::new([
-    ".",
-    ".",
-    ".",
-    ".",
-    ".",
-    ".",
-    "#",
-    ".",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    ".....",
+    "..#..",
+    ".....",
 ]);
 
 #[rustfmt::skip]
 const COLON: Glyph = Glyph::new([
-    ".",
-    ".",
-    "#",
-    ".",
-    ".",
-    ".",
-    "#",
-    ".",
+    ".....",
+    ".....",
+    "..#..",
+    ".....",
+    ".....",
+    ".....",
+    "..#..",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -598,38 +601,62 @@ const PERCENT: Glyph = Glyph::new([
 
 #[rustfmt::skip]
 const LEFT_PARENTHESIS: Glyph = Glyph::new([
-    "..##",
-    ".#..",
-    "#...",
-    "#...",
-    "#...",
-    ".#..",
-    "..##",
-    "....",
+    "...##",
+    "..#..",
+    ".#...",
+    ".#...",
+    ".#...",
+    "..#..",
+    "...##",
+    ".....",
 ]);
 
 #[rustfmt::skip]
 const RIGHT_PARENTHESIS: Glyph = Glyph::new([
-    "##..",
-    "..#.",
-    "...#",
-    "...#",
-    "...#",
-    "..#.",
-    "##..",
-    "....",
+    "##...",
+    "..#..",
+    "...#.",
+    "...#.",
+    "...#.",
+    "..#..",
+    "##...",
+    ".....",
 ]);
 
 #[rustfmt::skip]
 const VERTICAL_BAR: Glyph = Glyph::new([
-    "#",
-    "#",
-    "#",
-    "#",
-    "#",
-    "#",
-    "#",
-    "#",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+    "..#..",
+]);
+
+#[rustfmt::skip]
+const LESS_THAN: Glyph = Glyph::new([
+    ".....",
+    "...##",
+    ".##..",
+    "#....",
+    ".##..",
+    "...##",
+    ".....",
+    ".....",
+]);
+
+#[rustfmt::skip]
+const GREATER_THAN: Glyph = Glyph::new([
+    ".....",
+    "##...",
+    "..##.",
+    "....#",
+    "..##.",
+    "##...",
+    ".....",
+    ".....",
 ]);
 
 #[rustfmt::skip]
@@ -648,19 +675,16 @@ const MISSING: Glyph = Glyph::new([
 mod tests {
     use super::*;
 
-    const CHARACTERS: &str = "abcdefghijklmnopqrstuvwxyz0123456789 .:-+/%()|";
+    const CHARACTERS: &str = "abcdefghijklmnopqrstuvwxyz0123456789 .:-+/%()|<>";
 
     #[test]
-    fn every_glyph_has_rows_of_equal_width() {
-        for character in CHARACTERS.chars() {
+    fn every_glyph_fills_the_monospace_cell() {
+        for character in CHARACTERS.chars().chain(['?']) {
             let glyph = Glyph::of(character);
 
             assert!(
-                glyph
-                    .rows
-                    .iter()
-                    .all(|row| row.len() == glyph.rows[0].len()),
-                "{character:?} has uneven rows"
+                glyph.rows.iter().all(|row| row.len() == WIDTH as usize),
+                "{character:?} is not {WIDTH} pixels wide"
             );
         }
     }

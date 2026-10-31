@@ -1,6 +1,7 @@
 use serde::Deserialize;
 
 use super::EyeThrow;
+use super::PlayerPosition;
 use super::Prediction;
 use super::ResultType;
 
@@ -9,7 +10,8 @@ use super::ResultType;
 pub struct Stronghold {
     pub result_type: ResultType,
     pub eye_throws: Vec<EyeThrow>,
-    pub predictions: Vec<Prediction>
+    pub predictions: Vec<Prediction>,
+    pub player_position: Option<PlayerPosition>
 }
 
 impl Stronghold {
